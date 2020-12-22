@@ -10,7 +10,7 @@ pub struct Tuple {
 }
 
 impl Tuple {
-    fn new(x: f64, y: f64, z: f64, w: f64) -> Self {
+    pub fn new(x: f64, y: f64, z: f64, w: f64) -> Self {
         Tuple {x, y, z, w}
     }
 }
@@ -24,7 +24,7 @@ pub struct Point {
 }
 
 impl Point {
-    fn new(x: f64, y: f64, z: f64) -> Tuple {
+    pub fn new(x: f64, y: f64, z: f64) -> Tuple {
         Tuple {x, y, z, w: 1.0 }
     }
 }
@@ -41,6 +41,8 @@ pub trait TupleProperties {
     fn mag(&self) -> f64;
 
     fn normalize(&self) -> Tuple;
+
+    fn hadamard_product(&self, rhs: Tuple) -> Tuple;
 }
 
 impl TupleProperties for Tuple {
@@ -69,6 +71,10 @@ impl TupleProperties for Tuple {
     fn normalize(&self) -> Tuple {
         let norm = self.mag();
         Tuple::new(self.x / norm, self.y / norm, self.z / norm, self.w / norm)
+    }
+
+    fn hadamard_product(&self, rhs: Tuple) -> Tuple {
+        Tuple::new(self.x * rhs.x, self.y * rhs.y, self.z * rhs.z, self.w * rhs.w)
     }
 }
 
