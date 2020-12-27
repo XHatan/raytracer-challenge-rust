@@ -1,5 +1,7 @@
 pub mod tuple;
 mod canvas;
+mod matrix;
+
 use canvas::Canvas;
 use crate::canvas::CanvasProperties;
 

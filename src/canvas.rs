@@ -1,6 +1,6 @@
-use crate::tuple::{TupleProperties, Tuple};
+use crate::tuple::Tuple;
 extern crate image;
-use image::{GenericImage, ImageBuffer, RgbImage, Rgb, ColorType};
+use image::ColorType;
 use image::save_buffer_with_format;
 use image::EncodableLayout;
 use self::image::{Rgba, RgbaImage};
@@ -52,8 +52,7 @@ impl CanvasProperties for Canvas {
 mod tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
-    use crate::tuple::{TupleProperties, Point, Tuple};
-    use std::ptr::null;
+    use crate::tuple::TupleProperties;
 
     #[test]
     fn test_color_is_not_a_point() {
@@ -65,13 +64,8 @@ mod tests {
     fn test_color_operations() {
         let vector = Color::new(2.0, 3.0, 4.0, 0.0);
         let color = Color::new(1.0, 2.0, 3.0, 0.0);
-        let colorSum = vector + color;
-        assert_eq!(f64::abs(colorSum.x - 3.0) < 0.001, true);
-    }
-
-    #[test]
-    fn test_canvas_construction() {
-        let canvas = Canvas::new(20, 20);
+        let color_sum = vector + color;
+        assert_eq!(f64::abs(color_sum.x - 3.0) < 0.001, true);
     }
 
     #[test]
@@ -82,6 +76,4 @@ mod tests {
         let p = canvas.pixel_at(1,1);
         assert_eq!(f64::abs(p.x - 2.0) <= 0.01, true);
     }
-
-
 }

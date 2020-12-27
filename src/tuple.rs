@@ -1,5 +1,4 @@
 use std::ops;
-use std::cmp::Ordering;
 
 #[derive(Copy, Clone)]
 pub struct Tuple {
