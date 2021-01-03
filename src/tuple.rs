@@ -1,4 +1,6 @@
 use std::ops;
+use crate::matrix::Matrix;
+use nalgebra::DMatrix;
 
 #[derive(Copy, Clone)]
 pub struct Tuple {
@@ -19,7 +21,7 @@ pub struct Point {
     pub x: f64,
     pub y: f64,
     pub z: f64,
-    w: f64,
+    pub(crate) w: f64,
 }
 
 impl Point {
@@ -42,6 +44,8 @@ pub trait TupleProperties {
     fn normalize(&self) -> Tuple;
 
     fn hadamard_product(&self, rhs: Tuple) -> Tuple;
+
+    fn to_matrix(&self) -> Matrix;
 }
 
 impl TupleProperties for Tuple {
@@ -74,6 +78,15 @@ impl TupleProperties for Tuple {
 
     fn hadamard_product(&self, rhs: Tuple) -> Tuple {
         Tuple::new(self.x * rhs.x, self.y * rhs.y, self.z * rhs.z, self.w * rhs.w)
+    }
+
+    fn to_matrix(&self) -> Matrix {
+        let mut data = DMatrix::zeros(4, 1);
+        data[(0, 0)] = self.x;
+        data[(1, 0)] = self.y;
+        data[(2, 0)] = self.z;
+        data[(3, 0)] = self.w;
+        Matrix {data}
     }
 }
 
@@ -189,6 +202,7 @@ mod tests {
         let vector = Tuple::new(2.5, 3.0, 4.0, 0.0);
         let vector2 = Tuple::new(1.0, 2.0, 1.0, 0.0);
         assert_eq!(f64::abs(vector.dot(vector2) - 12.5) < 0.01, true);
+        assert_eq!(vector2.y, 2.0);
     }
 
     #[test]

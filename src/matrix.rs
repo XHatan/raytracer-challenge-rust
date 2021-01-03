@@ -1,18 +1,22 @@
 use nalgebra;
+use crate::tuple::{Tuple, TupleProperties};
+use std::ops::Mul;
+use nalgebra::DMatrix;
 
 pub struct Matrix {
     pub data: nalgebra::DMatrix<f64>
 }
 
 pub trait MatrixProperties {
-    fn dot(&self, m2: Matrix) -> Matrix;
+    // fn data(&self) -> &nalgebra::DMatrix<f64>;
+    fn dot(&self, m2: &Matrix) -> Matrix;
     fn transpose(&self) -> Matrix;
     fn inverse(&self) -> Matrix;
 }
 
 impl MatrixProperties for Matrix {
-    fn dot(&self, m2: Matrix) -> Matrix {
-        Matrix {data: self.data.clone() * m2.data}
+    fn dot(&self, m2: &Matrix) -> Matrix {
+        Matrix {data: self.data.clone() * &m2.data}
     }
 
     fn transpose(&self) -> Matrix {
@@ -39,6 +43,23 @@ impl std::ops::IndexMut<(usize, usize)> for Matrix {
     }
 }
 
+impl std::ops::Mul<Tuple> for Matrix {
+    type Output = Matrix;
+
+    fn mul(self, rhs: Tuple) -> Self::Output {
+        let rhs_in_matrix = rhs.to_matrix();
+        self.dot(&rhs_in_matrix)
+    }
+}
+
+impl std::ops::Mul<Matrix> for Matrix {
+    type Output = Matrix;
+
+    fn mul(self, rhs: Matrix) -> Self::Output {
+        self.dot(&rhs)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -51,7 +72,7 @@ mod tests {
         let mut m2 = Matrix {data: DMatrix::zeros(2, 2)};
         m2[(0, 0)] = 1.0;
         m2[(1, 1)] = 1.0;
-        let m3 = m2.dot(matrix);
+        let m3 = m2.dot(&matrix);
         assert_eq!(f64::abs(m3[(0, 0)] - 1.0) < 0.001, true);
     }
 
@@ -62,7 +83,7 @@ mod tests {
         let mut m2 = Matrix {data: DMatrix::zeros(2, 2)};
         m2[(0, 0)] = 1.0;
         m2[(1, 1)] = 1.0;
-        let m3 = m2.dot(matrix);
+        let m3 = m2.dot(&matrix);
         assert_eq!(f64::abs(m3[(0, 0)] - 1.0) < 0.001, true);
     }
 
@@ -93,8 +114,20 @@ mod tests {
         matrix[(0, 1)] = 3.0;
         matrix[(1, 1)] = 5.0;
         let inv: Matrix = matrix.inverse();
-        let product = matrix.dot(inv);
+        let product = matrix.dot(&inv);
         assert!(f64::abs(product[(0, 0)] - 1.0) < 0.01);
+        assert!(inv.data[(0, 0)] <= 1.0);
+    }
+
+    #[test]
+    fn test_matrix_times_tuple() {
+        let mut matrix = Matrix {
+            data: DMatrix::<f64>::identity(4, 4)
+        };
+        matrix[(0, 3)] = 1.0;
+        let tup = Tuple::new(2.0, 3.0, 4.0, 1.0);
+        let result = matrix * tup;
+        assert!(f64::abs(result[(0, 0)] - 3.0) < 0.01);
     }
 
 

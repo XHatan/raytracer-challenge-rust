@@ -1,6 +1,11 @@
 pub mod tuple;
 mod canvas;
 mod matrix;
+mod transformation;
+mod ray;
+mod vector;
+mod sphere;
+mod intersection;
 
 use canvas::Canvas;
 use crate::canvas::CanvasProperties;
