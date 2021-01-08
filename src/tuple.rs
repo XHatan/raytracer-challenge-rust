@@ -122,6 +122,7 @@ impl ops::Div<f64> for Tuple {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.

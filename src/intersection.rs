@@ -1,7 +1,14 @@
 
-pub struct Object {}
+// pub struct Object {}
+
+use crate::sphere::Sphere;
 
 pub struct Intersection {
     t: f64,
-    object: Object
+    object: Sphere
 }
+
+pub struct Intersections {
+    data: Vec<Intersection>
+}
+

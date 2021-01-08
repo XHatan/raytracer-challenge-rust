@@ -1,13 +1,26 @@
 use crate::matrix::{Matrix, MatrixProperties};
 use nalgebra;
 use crate::tuple::{Tuple, TupleProperties};
+use crate::ray::Ray;
+use std::ops::Mul;
 
 pub struct Transform {
     matrix: Matrix,
 }
 
+pub trait  TransformProperty {
+    fn new() -> Transform;
+    fn identity(&mut self) -> Transform;
+    fn rotate_x(&mut self, radian: f64) -> Transform;
+    fn rotate_y(&mut self, radian: f64) -> Transform;
+    fn rotate_z(&mut self, radian: f64) -> Transform;
+    fn translate(&mut self, x: f64, y: f64, z: f64) -> Transform;
+    fn scaling(&mut self, x: f64, y: f64, z: f64) -> Transform;
+    fn shear(&mut self, x_y: f64, x_z: f64, y_x: f64, y_z: f64, z_x: f64, z_y: f64) -> Transform;
+    fn dot(&self, rhs: Tuple) -> Tuple;
+}
 
-impl Transform {
+impl TransformProperty for Transform {
     fn new() -> Transform {
         Transform {matrix: Matrix {data: nalgebra::base::DMatrix::<f64>::identity(4, 4) } }
     }
@@ -90,6 +103,27 @@ impl Transform {
     }
 }
 
+impl std::ops::Index<(usize, usize)> for Transform {
+    type Output = f64;
+
+    fn index(&self, index: (usize, usize)) -> &f64 {
+        &self.matrix[index]
+    }
+}
+
+// impl std::ops::IndexMut<(usize, usize)> for Matrix {
+//     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+//         &mut self.data[index]
+//     }
+// }
+
+
+impl Clone for Transform {
+    fn clone(&self) -> Self {
+        Transform {matrix: Matrix {data: self.matrix.data.clone()}}
+    }
+}
+
 impl std::ops::Mul<Tuple> for Transform {
     type Output = Tuple;
 
@@ -97,6 +131,16 @@ impl std::ops::Mul<Tuple> for Transform {
         let rhs_in_matrix = rhs.to_matrix();
         let m2 = self.matrix.dot(&rhs_in_matrix);
         Tuple::new(m2.data[(0, 0)], m2.data[(1, 0)], m2.data[(2, 0)], m2.data[(3, 0)])
+    }
+}
+
+impl std::ops::Mul<Ray> for Transform {
+    type Output = Ray;
+
+    fn mul(self, rhs: Ray) -> Ray {
+        let direction = self.dot(rhs.direction());
+        let origin = self.dot(rhs.origin());
+        Ray::new(origin, direction)
     }
 }
 
