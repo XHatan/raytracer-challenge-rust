@@ -45,6 +45,8 @@ pub trait TupleProperties {
 
     fn hadamard_product(&self, rhs: Tuple) -> Tuple;
 
+    fn reflect(&self, rhs: Tuple) -> Tuple;
+
     fn to_matrix(&self) -> Matrix;
 }
 
@@ -78,6 +80,11 @@ impl TupleProperties for Tuple {
 
     fn hadamard_product(&self, rhs: Tuple) -> Tuple {
         Tuple::new(self.x * rhs.x, self.y * rhs.y, self.z * rhs.z, self.w * rhs.w)
+    }
+
+    fn reflect(&self, rhs: Tuple) -> Tuple {
+        let input = self.clone();
+        input - rhs * 2.0 * self.dot(rhs)
     }
 
     fn to_matrix(&self) -> Matrix {
@@ -210,6 +217,17 @@ mod tests {
     fn test_tuple_normalize() {
         let vector = Tuple::new(2.0, 2.0, 2.0, 2.0);
         assert_eq!(f64::abs(vector.normalize().x - 0.5) < 0.01, true);
+    }
+
+    #[test]
+    fn test_reflection() {
+        let v = Tuple::new(1.0, -1.0, 0.0, 0.0);
+        let normal = Tuple::new(0.0, 1.0, 0.0, 0.0);
+        let v = v.reflect(normal);
+        assert_eq!(f64::abs(v.x - 1.0) < 0.001, true);
+        assert_eq!(f64::abs(v.y - 1.0) < 0.001, true);
+        assert_eq!(f64::abs(v.z) < 0.001, true);
+        assert_eq!(f64::abs(v.w) < 0.001, true);
     }
 
 }

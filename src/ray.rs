@@ -22,7 +22,7 @@ impl Ray {
 
 
 
-fn position_from_ray(r: Ray, distance: f64) -> Tuple {
+pub fn position_from_ray(r: Ray, distance: f64) -> Tuple {
     r.origin() + r.direction() * distance
 }
 

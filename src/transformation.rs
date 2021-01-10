@@ -14,10 +14,12 @@ pub trait  TransformProperty {
     fn rotate_x(&mut self, radian: f64) -> Transform;
     fn rotate_y(&mut self, radian: f64) -> Transform;
     fn rotate_z(&mut self, radian: f64) -> Transform;
-    fn translate(&mut self, x: f64, y: f64, z: f64) -> Transform;
+    fn translate(&self, x: f64, y: f64, z: f64) -> Transform;
     fn scaling(&mut self, x: f64, y: f64, z: f64) -> Transform;
     fn shear(&mut self, x_y: f64, x_z: f64, y_x: f64, y_z: f64, z_x: f64, z_y: f64) -> Transform;
     fn dot(&self, rhs: Tuple) -> Tuple;
+    fn inverse(&self) -> Transform;
+    fn transpose(&self) -> Transform;
 }
 
 impl TransformProperty for Transform {
@@ -63,7 +65,7 @@ impl TransformProperty for Transform {
         Transform {matrix: Matrix {data: matrix.data * self.matrix.data.clone()}}
     }
 
-    fn translate(&mut self, x: f64, y: f64, z: f64) -> Transform {
+    fn translate(&self, x: f64, y: f64, z: f64) -> Transform {
         let mut matrix = Matrix {data: nalgebra::base::DMatrix::<f64>::identity(4, 4)};
         matrix[(0, 3)] = x;
         matrix[(1, 3)] = y;
@@ -100,6 +102,17 @@ impl TransformProperty for Transform {
         let rhs_in_matrix = rhs.to_matrix();
         let m2 = self.matrix.dot(&rhs_in_matrix);
         Tuple::new(m2.data[(0, 0)], m2.data[(1, 0)], m2.data[(2, 0)], m2.data[(3, 0)])
+    }
+
+    fn inverse(&self) -> Transform {
+        let data = self.matrix.inverse();
+
+        Transform {matrix: data}
+    }
+
+    fn transpose(&self) -> Transform {
+        let data = self.matrix.transpose();
+        Transform {matrix: data}
     }
 }
 
