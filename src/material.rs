@@ -1,16 +1,18 @@
-use crate::tuple::{Tuple, TupleProperties};
+use crate::tuple::{Tuple, TupleProperties, Point, Vector, VectorProperties};
 use crate::light::{PointLight, PointLightProperties};
 
 #[derive(Clone, Copy)]
 pub struct Material {
     color: Tuple,
-    ambient: f64,
+    pub(crate) ambient: f64,
     diffuse: f64,
     specular: f64,
     shininess: f64
 }
 
 pub trait MaterialProperties {
+    // ambient, diffuse and specular typically [0, 1]
+    // shininess typically 10 to 200
     fn new(color: Tuple, ambient: f64, diffuse: f64, specular: f64, shininess: f64) -> Material;
 
     fn color(&self) -> Tuple;
@@ -26,24 +28,27 @@ impl MaterialProperties for Material {
     }
 }
 
-pub fn lighting(m: Material, light: PointLight, position: Tuple, eyev: Tuple, normalv: Tuple) -> Tuple {
+pub fn phong_lighting(m: Material, light: PointLight, intersect_point: Point, eyev: Vector, normalv: Vector, in_shadow: bool) -> Tuple {
     let black = Tuple::new(0.0, 0.0, 0.0 ,0.0);
     let effective_color = m.color().hadamard_product(light.intensity());
     // A = L_a * M_a;
     let ambient = effective_color * m.ambient;
+    if in_shadow {
+       return ambient;
+    }
 
     // D = L_d * M_d * (L_dir.dot(normal))
-    let light_direction = (light.position() - position).normalize();
+    let light_direction = (light.position() - intersect_point).normalize();
     let light_dot_normal = light_direction.dot(normalv);
-    let mut diffuse: Tuple;
-    let mut specular: Tuple;
+    let diffuse: Tuple;
+    let specular: Tuple;
     if light_dot_normal < 0.0 {
         // light is on the other side of the surface
         diffuse = black;
         specular = black;
     } else {
         diffuse = effective_color * m.diffuse * light_dot_normal;
-        let reflectv = (Tuple::new(0.0, 0.0, 0.0, 0.0) - light_direction).reflect(normalv);
+        let reflectv = (-1.0 * light_direction).reflect(normalv);
         let reflectv_dot_eye = reflectv.dot(eyev);
         if reflectv_dot_eye <= 0.0 {
             specular = black;
@@ -60,17 +65,7 @@ pub fn lighting(m: Material, light: PointLight, position: Tuple, eyev: Tuple, no
 mod tests {
     use super::*;
     use crate::light::PointLightProperties;
-
-    // pub struct SetUp {
-    //     m: Material,
-    //     position: Tuple
-    // }
-    //
-    // impl SetUp {
-    //     fn new() -> SetUp {
-    //         let m = Material::new()
-    //     }
-    // }
+    use crate::tuple::{PointProperties, VectorProperties};
 
     #[test]
     fn material_construction() {
@@ -81,11 +76,11 @@ mod tests {
     #[test]
     fn test_lighting() {
         let m = Material::new(Tuple::new(1.0, 1.0, 1.0, 1.0), 0.1, 0.9, 0.9, 200.0);
-        let eyev = Tuple::new(0.0, 0.0, -1.0, 0.0);
-        let normalv = Tuple::new(0.0, 0.0, -1.0, 0.0);
-        let light = PointLight::new(Tuple::new(0.0, 0.0, -10.0, 1.0), Tuple::new(1.0, 1.0, 1.0, 0.0));
-        let p = Tuple::new(0.0, 0.0, 0.0, 1.0);
-        let result = lighting(m, light, p, eyev, normalv);
+        let eyev = Vector::new(0.0, 0.0, -1.0);
+        let normalv = Vector::new(0.0, 0.0, -1.0);
+        let light = PointLight::new(Point::new(0.0, 0.0, -10.0), Tuple::new(1.0, 1.0, 1.0, 0.0));
+        let p = Point::new(0.0, 0.0, 0.0);
+        let result = phong_lighting(m, light, p, eyev, normalv, false);
         assert_eq!(f64::abs(result.x - 1.9) < 0.01, true);
         assert_eq!(f64::abs(result.y - 1.9) < 0.01, true);
     }
@@ -93,13 +88,40 @@ mod tests {
     #[test]
     fn test_lighting_2() {
         let m = Material::new(Tuple::new(1.0, 1.0, 1.0, 1.0), 0.1, 0.9, 0.9, 200.0);
-        let eyev = Tuple::new(0.0, 0.0, -1.0, 0.0);
-        let normalv = Tuple::new(0.0, 0.0, -1.0, 0.0);
-        let light = PointLight::new(Tuple::new(0.0, 10.0, -10.0, 1.0), Tuple::new(1.0, 1.0, 1.0, 0.0));
-        let p = Tuple::new(0.0, 0.0, 0.0, 1.0);
-        let result = lighting(m, light, p, eyev, normalv);
+        let eyev = Vector::new(0.0, 0.0, -1.0);
+        let normalv = Vector::new(0.0, 0.0, -1.0);
+        let light = PointLight::new(Point::new(0.0, 10.0, -10.0), Tuple::new(1.0, 1.0, 1.0, 0.0));
+        let p = Point::new(0.0, 0.0, 0.0);
+        let result = phong_lighting(m, light, p, eyev, normalv, false);
         assert_eq!(f64::abs(result.x - 0.7364) < 0.01, true);
         assert_eq!(f64::abs(result.y - 0.7364) < 0.01, true);
+        assert_eq!(f64::abs(result.z - 0.7364) < 0.01, true);
+    }
+
+    #[test]
+    fn test_lighting_3() {
+        let m = Material::new(Tuple::new(1.0, 1.0, 1.0, 1.0), 0.1, 0.9, 0.9, 200.0);
+        let eyev = Vector::new(0.0, -f64::sqrt(2.0) / 2.0, -f64::sqrt(2.0) / 2.0);
+        let normalv = Vector::new(0.0, 0.0, -1.0);
+        let light = PointLight::new(Point::new(0.0, 10.0, -10.0), Tuple::new(1.0, 1.0, 1.0, 0.0));
+        let p = Point::new(0.0, 0.0, 0.0);
+        let result = phong_lighting(m, light, p, eyev, normalv, false);
+        assert_eq!(f64::abs(result.x - 1.6364) < 0.01, true);
+        assert_eq!(f64::abs(result.y - 1.6364) < 0.01, true);
+        assert_eq!(f64::abs(result.z - 1.6364) < 0.01, true);
+    }
+
+    #[test]
+    fn test_lighting_the_surface_in_shadow() {
+        let eyev = Vector::new(0.0, 0.0, -1.0);
+        let normalv = Vector::new(0.0, 0.0, -1.0);
+        let light = PointLight::new(Point::new(0.0, 0.0, -10.0), Tuple::new(1.0, 1.0, 1.0, 1.0));
+        let in_shadow = true;
+        let m = Material::new(Tuple::new(1.0, 1.0, 1.0, 1.0), 0.1, 0.9, 0.9, 200.0);
+        let p = Point::new(0.0, 0.0, 0.0);
+        let result = phong_lighting(m, light, p, eyev, normalv, in_shadow);
+        // should just be 0.1 * 1.0
+        assert_eq!(result == Tuple::new(0.1, 0.1, 0.1, 0.1), true);
     }
 }
 

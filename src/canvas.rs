@@ -8,24 +8,24 @@ use self::image::{Rgba, RgbaImage};
 type Color = Tuple;
 
 pub struct Canvas {
-    width: i32,
-    height: i32,
+    width: u32,
+    height: u32,
     pixels: RgbaImage
 }
 
 pub trait CanvasProperties {
-    fn new(width: i32, height: i32) -> Canvas;
+    fn new(width: u32, height: u32) -> Canvas;
 
     fn write_pixel(&mut self, x: u32, y: u32, color: Color);
 
     fn pixel_at(&self, x: u32, y: u32) -> Color;
 
-    fn to_ppm(&self);
+    fn to_ppm(&self, file: &str);
 }
 
 impl CanvasProperties for Canvas {
-    fn new(width: i32, height: i32) -> Canvas {
-        Canvas {width, height, pixels: RgbaImage::new(512, 512)}
+    fn new(width: u32, height: u32) -> Canvas {
+        Canvas {width, height, pixels: RgbaImage::new(width , height)}
     }
 
     fn write_pixel(&mut self, x: u32, y: u32, color: Color) {
@@ -34,7 +34,7 @@ impl CanvasProperties for Canvas {
     }
 
     fn pixel_at(&self, x: u32, y: u32) -> Color {
-        if (x as i32) >= self.width || (y as i32) >= self.height {
+        if x >= self.width || y >= self.height {
             let pixel = self.pixels.get_pixel((self.width -1 ) as u32, (self.height - 1) as u32);
             return Color::new(pixel[0] as f64, pixel[1] as f64, pixel[2] as f64, pixel[3] as f64);
         }
@@ -42,8 +42,8 @@ impl CanvasProperties for Canvas {
         Color::new(pixel[0] as f64, pixel[1] as f64, pixel[2] as f64, pixel[3] as f64)
     }
 
-    fn to_ppm(&self) {
-        save_buffer_with_format("output.png", self.pixels.as_bytes(), self.pixels.width(), self.pixels.height(),
+    fn to_ppm(&self, file: &str) {
+        save_buffer_with_format(file, self.pixels.as_bytes(), self.pixels.width(), self.pixels.height(),
                                 ColorType::Rgba8, image::ImageFormat::Png).unwrap()
     }
 }

@@ -16,17 +16,120 @@ impl Tuple {
     }
 }
 
+// type supports copy will copy-by-default, otherwise move by default
 #[derive(Copy, Clone)]
 pub struct Point {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-    pub(crate) w: f64,
+    pub data: Tuple
 }
 
-impl Point {
-    pub fn new(x: f64, y: f64, z: f64) -> Tuple {
-        Tuple {x, y, z, w: 1.0 }
+#[derive(Copy, Clone)]
+pub struct Vector {
+    pub data: Tuple
+}
+
+pub trait PointProperties {
+    fn new(x: f64, y: f64, z: f64) -> Point;
+
+    fn x(&self) -> f64;
+
+    fn y(&self) -> f64;
+
+    fn z(&self) -> f64;
+}
+
+impl PointProperties for Point {
+    fn new(x: f64, y: f64, z: f64) -> Point {
+        Point {data: Tuple::new(x, y, z, 1.0)}
+    }
+
+    fn x(&self) -> f64 {
+        self.data.x
+    }
+
+    fn y(&self) -> f64 {
+        self.data.y
+    }
+
+    fn z(&self) -> f64 {
+        self.data.z
+    }
+}
+
+pub trait VectorProperties {
+    fn new(x: f64, y: f64, z: f64) -> Vector;
+
+    fn dot(&self, rhs: Vector) -> f64;
+
+    fn cross(&self, rhs: Vector) -> Vector;
+
+    fn neg(&self) -> Vector;
+
+    fn mag(&self) -> f64;
+
+    fn normalize(&self) -> Vector;
+
+    fn hadamard_product(&self, rhs: Vector) -> Vector;
+
+    fn reflect(&self, rhs: Vector) -> Vector;
+
+    fn to_matrix(&self) -> Matrix;
+
+    fn x(&self) -> f64;
+
+    fn y(&self) -> f64;
+
+    fn z(&self) -> f64;
+
+}
+
+impl VectorProperties for Vector {
+    fn new(x: f64, y: f64, z: f64) -> Vector {
+        Vector {data: Tuple::new(x, y, z, 0.0)}
+    }
+
+    fn dot(&self, rhs: Vector) -> f64 {
+        self.data.dot(rhs.data)
+    }
+
+    fn cross(&self, rhs: Vector) -> Vector {
+       Vector{data: self.data.cross(rhs.data)}
+    }
+
+    fn neg(&self) -> Vector {
+        Vector {data: self.data.neg()}
+    }
+
+    fn mag(&self) -> f64 {
+        self.data.mag()
+    }
+
+    // TODO: XHATAN throw errors
+    fn normalize(&self) -> Vector {
+        Vector {data: self.data.normalize()}
+    }
+
+    fn hadamard_product(&self, rhs: Vector) -> Vector {
+        Vector {data: self.data.hadamard_product(rhs.data)}
+    }
+
+    fn reflect(&self, rhs: Vector) -> Vector {
+        Vector {data: self.data.reflect(rhs.data)}
+    }
+
+    fn to_matrix(&self) -> Matrix {
+        self.data.to_matrix()
+    }
+
+    fn x(&self) -> f64 {
+        self.data.x
+    }
+
+    fn y(&self) -> f64 {
+        self.data.y
+    }
+
+    fn z(&self) -> f64 {
+        self.data.z
     }
 }
 
@@ -105,6 +208,22 @@ impl ops::Add for Tuple {
     }
 }
 
+impl ops::Sub<Point> for Point {
+    type Output = Vector;
+
+    fn sub(self, rhs: Point) -> Vector {
+        Vector {data: self.data - rhs.data}
+    }
+}
+
+impl ops::Mul<Tuple> for f64 {
+    type  Output = Tuple;
+
+    fn mul(self, rhs: Tuple) -> Tuple {
+        Tuple::new(rhs.x * self, rhs.y * self, rhs.z * self , rhs.w * self)
+    }
+}
+
 impl ops::Sub for Tuple {
     type  Output = Tuple;
 
@@ -129,6 +248,62 @@ impl ops::Div<f64> for Tuple {
     }
 }
 
+impl PartialEq<Tuple> for Tuple {
+    fn eq(&self, other: &Tuple) -> bool {
+        return if f64::abs(self.x - other.x) < 0.001 && f64::abs(self.y - other.y) < 0.001 && f64::abs(self.z - other.z) < 0.001 &&
+            f64::abs(self.w - other.w) < 0.001 {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl ops::Mul<f64> for Vector {
+    type Output = Vector;
+
+    fn mul(self, rhs: f64) -> Vector {
+        Vector {data: self.data * rhs}
+    }
+}
+
+impl ops::Mul<Vector> for f64 {
+    type Output = Vector;
+
+    fn mul(self, rhs: Vector) -> Vector {
+        Vector {data: self * rhs.data}
+    }
+}
+
+
+impl ops::Add<Vector> for Point {
+    type Output = Point;
+
+    fn add(self, rhs: Vector) -> Point {
+        Point {data: self.data + rhs.data}
+    }
+}
+
+impl ops::Add<Point> for Vector {
+    type Output = Point;
+
+    fn add(self, rhs: Point) -> Point {
+        Point {data: self.data + rhs.data}
+    }
+}
+
+impl PartialEq<Vector> for Vector {
+    fn eq(&self, other: &Vector) -> bool {
+        return self.data == other.data;
+    }
+}
+
+impl PartialEq<Point> for Point {
+    fn eq(&self, other: &Point) -> bool {
+        return self.data == other.data;
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -142,22 +317,15 @@ mod tests {
 
         let vector2 = Tuple::new(2.1, 3.0, 4.4, 0.0);
         assert_eq!(vector2.is_point(), false);
-
-        let point1 = Point::new(1.0, 1.0, 1.0);
-        assert_eq!(point1.is_point(), true);
     }
 
     #[test]
     fn test_tuple_add() {
-        let vector = Tuple::new(2.0, 3.0, 4.0, 1.0);
-        let vector2 = Tuple::new(2.1, 3.0, 4.4, 0.0);
+        let vector = Vector::new(2.0, 3.0, 4.0);
+        let vector2 = Point::new(2.1, 3.0, 4.4);
 
         let vector3 = vector + vector2;
-        assert_eq!(vector3.x, 4.1);
-
-        let point = Point::new(2.0, 1.0, 3.0);
-        let p2 = point + vector2;
-        assert_eq!(p2.is_point(), true);
+        assert_eq!(vector3.x(), 4.1);
     }
 
     #[test]

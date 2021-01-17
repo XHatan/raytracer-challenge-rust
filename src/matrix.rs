@@ -1,6 +1,5 @@
 use nalgebra;
 use crate::tuple::{Tuple, TupleProperties};
-use std::ops::Mul;
 use nalgebra::DMatrix;
 
 pub struct Matrix {
@@ -57,6 +56,12 @@ impl std::ops::Mul<Matrix> for Matrix {
 
     fn mul(self, rhs: Matrix) -> Self::Output {
         self.dot(&rhs)
+    }
+}
+
+impl PartialEq<Matrix> for Matrix {
+    fn eq(&self, other: &Matrix) -> bool {
+        self.data == other.data
     }
 }
 
