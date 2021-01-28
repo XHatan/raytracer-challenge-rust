@@ -3,16 +3,16 @@ mod canvas;
 mod matrix;
 mod transformation;
 mod ray;
-mod sphere;
 mod intersection;
 mod light;
 mod material;
 mod world;
 mod camera;
+mod shape;
+mod pattern;
 
 use canvas::Canvas;
 use crate::canvas::CanvasProperties;
-use crate::sphere::{Sphere, hit, SphereProperties, intersect_sphere, default_sphere};
 use crate::tuple::{Tuple, TupleProperties, Point, PointProperties, VectorProperties, Vector};
 use crate::ray::Ray;
 use crate::transformation::{Transform, TransformProperty, ViewTransform};
@@ -21,7 +21,7 @@ use crate::material::{Material, MaterialProperties};
 use std::f64::consts::PI;
 use crate::world::{World, WorldProperties};
 use crate::camera::{Camera, CameraProperties, render};
-
+use crate::pattern::gradient_pattern;
 
 // fn run_chapter_5() {
 //     let canvas_width = 100;
@@ -102,23 +102,23 @@ use crate::camera::{Camera, CameraProperties, render};
 
 fn run_chapter_7() {
     let origin = Point::new(0.0, 0.0, 0.0);
-    let mut floor = Sphere::new(origin, 1.0);
+    let mut floor = shape::plane();
     floor.set_transform(Transform::new().scaling(10.0, 0.01, 10.0));
     let sphere_material = Material::new(
         Tuple::new(1.0 * 250.0, 0.9 * 250.0, 0.9 * 250.0, 255.0), 0.1, 0.7, 0.0, 200.0);
 
-    floor.set_material(sphere_material);
+    floor.set_material(&sphere_material);
 
-    let mut left_wall = Sphere::new(origin, 1.0);
+    let mut left_wall = shape::sphere();
     let transform = Transform::new().scaling(10.0, 0.01, 10.0)
         .rotate_x(PI/2.0)
         .rotate_y(-PI/4.0)
         .translate(0.0, 0.0, 5.0);
     left_wall.set_transform(transform);
-    left_wall.set_material(sphere_material);
+    left_wall.set_material(&sphere_material);
 
 
-    let mut right_wall = default_sphere();
+    let mut right_wall = shape::sphere();
     right_wall.set_transform(
         Transform::new()
             .scaling(10.0, 0.01, 10.0)
@@ -128,30 +128,30 @@ fn run_chapter_7() {
     );
 
     right_wall.set_material(
-        sphere_material
+        &sphere_material
     );
 
-    let mut middle = default_sphere();
+    let mut middle = shape::sphere();
     middle.set_transform(
         Transform::new()
             .translate(-0.5, 1.0, 0.5)
     );
     middle.set_material(
-        Material::new(
+        &Material::new(
             Tuple::new(0.1 * 250.0, 1.0 * 250.0, 0.5 * 250.0, 255.0),
             0.1, 0.7, 0.3, 200.0
 
         )
     );
 
-    let mut right = default_sphere();
+    let mut right = shape::sphere();
     right.set_transform(
         Transform::new()
             .scaling(0.5, 0.5, 0.5)
             .translate(1.5, 0.5, -0.5)
     );
     right.set_material(
-        Material::new(
+        &Material::new(
             Tuple::new(0.5 * 250.0, 1.0 * 250.0, 0.2 * 250.0, 255.0),
             0.1, 0.7, 0.3, 200.0
 
@@ -163,7 +163,7 @@ fn run_chapter_7() {
     world.objects = vec![floor, left_wall, right_wall, middle, right];
     world.light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Tuple::new(1.0, 1.0, 1.0, 1.0));
 
-    let mut camera = Camera::new(400.0, 200.0, PI / 2.0);
+    let mut camera = Camera::new(200.0, 100.0, PI / 2.0);
     camera.set_transform(
         ViewTransform(Point::new(0.0, 1.5, -5.0),
                       Point::new(0.0, 1.0, 0.0),
@@ -176,9 +176,174 @@ fn run_chapter_7() {
     canvas.to_ppm(file);
 }
 
+fn run_chapter_8() {
+    let origin = Point::new(0.0, 0.0, 0.0);
+    let mut floor = shape::plane();
+    floor.set_transform(Transform::new().translate(-0.5, 0.5, 1.0));
+    let sphere_material = Material::new(
+        Tuple::new(0.8 * 250.0, 0.7 * 250.0, 0.7 * 250.0, 255.0), 0.1, 0.7, 0.0, 200.0);
+
+    floor.set_material(&sphere_material);
+
+    let mut left_wall = shape::sphere();
+    let transform = Transform::new().scaling(10.0, 0.01, 10.0)
+        .rotate_x(PI/2.0)
+        .rotate_y(-PI/4.0)
+        .translate(0.0, 0.0, 5.0);
+    left_wall.set_transform(transform);
+    left_wall.set_material(&sphere_material);
+
+
+    let mut right_wall = shape::sphere();
+    right_wall.set_transform(
+        Transform::new()
+            .scaling(10.0, 0.01, 10.0)
+            .rotate_x(PI/2.0)
+            .rotate_y(PI/4.0)
+            .translate(0.0, 0.0, 5.0)
+    );
+
+    right_wall.set_material(
+        &sphere_material
+    );
+
+    let mut middle = shape::sphere();
+    middle.set_transform(
+        Transform::new()
+            .translate(-0.5, 1.0, 0.5)
+    );
+    middle.set_material(
+        &Material::new(
+            Tuple::new(0.1 * 250.0, 1.0 * 250.0, 0.5 * 250.0, 255.0),
+            0.1, 0.7, 0.4, 200.0
+        )
+    );
+
+    let mut right = shape::sphere();
+    right.set_transform(
+        Transform::new()
+            .scaling(0.5, 0.5, 0.5)
+            .translate(1.5, 0.5, -0.5)
+    );
+    right.set_material(
+        &Material::new(
+            Tuple::new(0.5 * 250.0, 1.0 * 250.0, 0.2 * 250.0, 255.0),
+            0.1, 0.7, 0.3, 200.0
+
+        )
+    );
+
+    let mut world = World::new();
+    world.objects.clear();
+    world.objects = vec![floor, left_wall, right_wall, middle, right];
+    world.light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Tuple::new(1.0, 1.0, 1.0, 1.0));
+
+    let mut camera = Camera::new(200.0, 100.0, PI / 2.0);
+    camera.set_transform(
+        ViewTransform(Point::new(0.0, 1.5, -5.0),
+                      Point::new(0.0, 1.0, 0.0),
+                      Vector::new(0.0, 1.0, 0.0)
+        )
+    );
+
+    let mut canvas = render(camera, world);
+    let file: &str = "output.png";
+    canvas.to_ppm(file);
+}
+
+
+fn run_chapter_9() {
+    let mut floor = shape::plane();
+    floor.set_transform(Transform::new().translate(0.0, 0.0, 1.0));
+    let mut sphere_material = Material::new(
+        Tuple::new(0.8 * 250.0, 0.7 * 250.0, 0.7 * 250.0, 255.0), 0.1, 0.7, 0.0, 200.0);
+
+    sphere_material.transparency = 0.5;
+    sphere_material.reflective = 0.7;
+    let pattern = gradient_pattern(Tuple::new(0.8 * 250.0, 0.7 * 250.0, 0.7 * 250.0, 255.0),
+                                   Tuple::new(0.2 * 250.0, 0.3 * 250.0, 0.3 * 250.0, 255.0));
+    sphere_material.set_pattern(&pattern);
+
+    floor.set_material(&sphere_material);
+
+    let mut left_wall = shape::plane();
+    let transform = Transform::new()
+        .rotate_x(PI/2.0)
+        .rotate_y(-PI/4.0)
+        .translate(0.0, 0.0, 5.0);
+    left_wall.set_transform(transform);
+    sphere_material.reflective = 0.1;
+    sphere_material.transparency = 0.0;
+    left_wall.set_material(&sphere_material);
+
+
+    let mut right_wall = shape::plane();
+    right_wall.set_transform(
+        Transform::new()
+            .scaling(10.0, 0.01, 10.0)
+            .rotate_x(PI/2.0)
+            .rotate_y(PI/4.0)
+            .translate(0.0, 0.0, 5.0)
+    );
+
+    right_wall.set_material(
+        &sphere_material
+    );
+
+    let mut middle = shape::sphere();
+    middle.set_transform(
+        Transform::new()
+            .translate(-0.5, 1.0, 0.5)
+    );
+    let mut middle_material = Material::new(
+        Tuple::new(0.1 * 250.0, 1.0 * 250.0, 0.5 * 250.0, 255.0),
+        0.1, 0.7, 0.4, 200.0
+    );
+    middle_material.transparency = 0.5;
+    middle_material.reflective = 0.7;
+
+    middle.set_material(
+        &middle_material
+    );
+
+    let mut right = shape::sphere();
+    right.set_transform(
+        Transform::new()
+            .scaling(0.5, 0.5, 0.5)
+            .translate(1.5, 0.5, -0.5)
+    );
+
+    let mut right_material = Material::new(
+        Tuple::new(0.7 * 250.0, 0.7 * 250.0, 0.2 * 250.0, 255.0),
+        0.1, 0.7, 0.3, 200.0
+    );
+    right_material.reflective = 1.0;
+    right_material.transparency = 1.0;
+    right.set_material(
+        &right_material
+    );
+
+    let mut world = World::new();
+    world.objects.clear();
+    world.objects = vec![floor, left_wall, right_wall, middle, right];
+    world.light = PointLight::new(Point::new(-10.0, 10.0, -10.0), Tuple::new(1.0, 1.0, 1.0, 1.0));
+
+    let mut camera = Camera::new(400.0, 200.0, PI / 2.0);
+    camera.set_transform(
+        ViewTransform(Point::new(0.0, 1.5, -5.0),
+                      Point::new(0.0, 1.0, 0.0),
+                      Vector::new(0.0, 1.0, 0.0)
+        )
+    );
+
+    let mut canvas = render(camera, world);
+    let file: &str = "output.png";
+    canvas.to_ppm(file);
+}
+
 fn main() {
     println!("Started!");
     // run_chapter_6();
-    run_chapter_7();
+    run_chapter_9();
     println!("Finished!");
 }

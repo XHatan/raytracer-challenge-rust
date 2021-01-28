@@ -1,6 +1,7 @@
 use std::ops;
 use crate::matrix::Matrix;
 use nalgebra::DMatrix;
+use std::ops::Sub;
 
 #[derive(Copy, Clone)]
 pub struct Tuple {
@@ -275,12 +276,27 @@ impl ops::Mul<Vector> for f64 {
     }
 }
 
+impl ops::Sub<Vector> for Vector {
+    type Output = Self;
+
+    fn sub(self, rhs: Vector) -> Self {
+        Vector {data: self.data - rhs.data}
+    }
+}
 
 impl ops::Add<Vector> for Point {
     type Output = Point;
 
     fn add(self, rhs: Vector) -> Point {
         Point {data: self.data + rhs.data}
+    }
+}
+
+impl ops::Sub<Vector> for Point {
+    type Output = Point;
+
+    fn sub(self, rhs: Vector) -> Point {
+        Point {data: self.data - rhs.data}
     }
 }
 

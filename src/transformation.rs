@@ -179,6 +179,18 @@ impl std::ops::Mul<Ray> for Transform {
     }
 }
 
+// impl  C
+
+impl std::ops::Mul<&Ray> for Transform {
+    type Output = Ray;
+
+    fn mul(self, rhs: &Ray) -> Ray {
+        let direction = Vector {data: self.dot(rhs.direction().data) };
+        let origin = Point {data: self.dot(rhs.origin().data)};
+        Ray::new(origin, direction)
+    }
+}
+
 impl PartialEq<Transform> for Transform {
     fn eq(&self, other: &Transform) -> bool {
         self.matrix == other.matrix
@@ -217,7 +229,6 @@ impl Clone for Transform {
         Transform {matrix: Matrix {data: self.matrix.data.clone()}}
     }
 }
-
 
 
 

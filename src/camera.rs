@@ -102,7 +102,7 @@ pub fn render(camera: Camera, world: World) -> Canvas {
     for y in 0..(camera.vsize - 1.0) as u32 {
         for x in 0..(camera.hsize - 1.0) as u32 {
             let ray = camera.ray_at_pixel(x as usize, y as usize);
-            let color = world.color_at_ray(&ray);
+            let color = world.color_at_ray(&ray, 1);
             // println!("color {} {} {}", color.x, color.y, color.z);
             image.write_pixel(x, y, color);
         }
