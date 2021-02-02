@@ -4,10 +4,11 @@ use crate::*;
 enum Kind {
     Sphere,
     Plane,
+    Cube,
+    Cylinder
 }
 
 pub trait KindProperties {
-
     fn normal_at(&self, point: Point) -> Vector;
 
     fn intersections(&self, ray: &Ray, transform: Transform) -> Vec<f64>;
@@ -15,6 +16,10 @@ pub trait KindProperties {
     fn sphere_intersections(&self, ray: &Ray, transform: Transform) -> Vec<f64>;
 
     fn plane_intersections(&self, ray: &Ray, transform: Transform) -> Vec<f64>;
+
+    fn cube_intersections(&self, ray: &Ray, transform: Transform) -> Vec<f64>;
+
+    fn cylinder_intersections(&self, ray_world: &Ray, transform: Transform) -> Vec<f64>;
 }
 
 impl KindProperties for Kind {
@@ -23,19 +28,39 @@ impl KindProperties for Kind {
         match self {
             Sphere => local_point - Point::new(0.0, 0.0, 0.0),
             Plane => Vector::new(0.0, 1.0, 0.0),
+            Cube => {
+                let abs_x = f64::abs(local_point.x());
+                let abs_y = f64::abs(local_point.y());
+                let abs_z = f64::abs(local_point.z());
+                let maxc = f64::max(abs_x, f64::max(abs_y, abs_z));
+                return if maxc == abs_x {
+                    Vector::new(local_point.x(), 0.0, 0.0)
+                } else if maxc == abs_y {
+                    Vector::new(0.0, local_point.y(), 0.0)
+                } else {
+                    Vector::new(0.0, 0.0, local_point.z())
+                }
+            }
+            Cylinder => {
+                Vector::new(local_point.x, 0.0, local_point.z)
+            }
         }
     }
 
+    // pub intersections
     fn intersections(&self, ray: &Ray, transform: Transform) -> Vec<f64> {
         match self {
             Sphere => self.sphere_intersections(ray, transform),
-            Plane => self.plane_intersections(ray, transform)
+            Plane => self.plane_intersections(ray, transform),
+            Cube => self.cube_intersections(ray, transform),
+            Cylinder => unimplemented!()
         }
     }
 
     fn sphere_intersections(&self, ray: &Ray, transform: Transform) -> Vec<f64> {
         let origin = Point::new(0.0, 0.0, 0.0);
 
+        // (origin + dir * t).mag == 1
         let r_t = transform.inverse() * ray;
         let sphere_to_ray = r_t.origin() - origin;
         let a = r_t.direction().dot(r_t.direction()); // dir^2
@@ -59,10 +84,76 @@ impl KindProperties for Kind {
             false => vec![]
         }
     }
+
+    fn cube_intersections(&self, ray_world: &Ray, transform: Transform) -> Vec<f64> {
+        let r_object = transform.inverse() * ray_world;
+        let x_t = check_axis(r_object.origin().x(), r_object.direction().x());
+        let y_t = check_axis(r_object.origin().y(), r_object.direction().y());
+        let z_t = check_axis(r_object.origin().z(), r_object.direction().z());
+
+        let t_min = f64::max(f64::max(x_t[0], y_t[0]), z_t[0]);
+        let t_max = f64::min(f64::min(x_t[1], y_t[1]), z_t[1]);
+
+        match t_min > t_max {
+            true => vec![],
+            false => vec![t_min, t_max]
+        }
+    }
+
+    fn cylinder_intersections(&self, ray_world: &Ray, transform: Transform) -> Vec<f64> {
+        let ray_obj = transform.inverse() * ray_world;
+        // point = (t * dir + origin)
+        // p2 = point(x, z)
+        // dir^2 + origin^2 + 2 * t * dir * origin
+        //
+        let a = f64::powf(ray_obj.direction().x(), 2.0) + f64::powf(ray_obj.direction().z(), 2.0);
+        if f64::abs(a) < 0.00001 {
+            vec![]
+        }
+        let b = 2 * ray_obj.origin().x() * ray_obj.direction().x() + 2 * ray_obj.origin().z() * ray_obj.direction().z();
+        let c = f64::powf(ray_obj.origin().x(), 2.0) + f64::powf(ray_obj.origin().z(), 2.0) - 1.0;
+        let disc = f64::powf(b, 2.0) - 4.0 * a * c;
+        return if disc < 0.0 {
+            vec![]
+        } else {
+            let t0 = (-b - f64::sqrt(disc)) / (2.0 * a);
+            let t1 = (-b + f64::sqrt(disc)) / (2.0 * a);
+            vec![t0, t1]
+        }
+    }
+}
+
+fn check_axis(origin_in_axis: f64, direction_in_axis: f64) -> Vec<f64> {
+    let mut tmin_numerator = -1.0 - origin_in_axis;
+    let mut tmax_numerator = 1.0 - origin_in_axis;
+    let mut tmin: f64;
+    let mut tmax: f64;
+    if f64::abs(direction_in_axis) >= intersection::EPSILON {
+        tmin = tmin_numerator / direction_in_axis;
+        tmax = tmax_numerator / direction_in_axis;
+    } else {
+        // tmin/max_numerator * INFINITY
+        if tmin_numerator > 0.0 {
+            tmin = f64::MAX;
+        } else {
+            tmin = f64::MIN;
+        }
+        if tmax_numerator > 0.0 {
+            tmax = f64::MAX;
+        } else {
+            tmax = f64::MIN;
+        }
+    }
+    if tmin > tmax {
+        swap(&mut tmin, &mut tmax);
+    }
+
+    return vec![tmin, tmax];
 }
 
 use self::Kind::*;
 use crate::intersection::Intersection;
+use std::mem::swap;
 
 pub struct Shape {
     pub material: Material,
@@ -85,6 +176,10 @@ impl Shape {
 
     pub fn plane() -> Shape {
         Shape::new(Plane)
+    }
+
+    pub fn cube() -> Shape {
+        Shape::new(Cube)
     }
 
     pub fn set_material(&mut self, material: &Material) {
@@ -206,6 +301,10 @@ pub fn hit(ts: Vec<Intersection>) -> Intersection {
     Intersection{t: -1.0, object: sphere()}
 }
 
+pub fn cube() -> Shape {
+    Shape::cube()
+}
+
 impl PartialEq for Shape {
     fn eq(&self, other: &Self) -> bool {
         self.material == other.material
@@ -215,6 +314,7 @@ impl PartialEq for Shape {
 mod tests {
     use super::*;
     use crate::tuple::{Point, PointProperties, Vector};
+    use crate::material::float_eq;
 
     #[test]
     fn sphere_is_behind_ray() {
@@ -353,5 +453,36 @@ mod tests {
         assert_eq!(f64::abs(xs[0].t - 1.0) < 0.001, true);
     }
 
+    #[test]
+    fn a_ray_intersects_a_cube() {
+        let c = cube();
+        let r = Ray::new(Point::new(5.0, 0.5, 0.0), Vector::new(-1.0, 0.0, 0.0));
+        let xs = c.intersect(&r);
 
+        assert!(float_eq(xs[0].t, 4.0));
+        assert!(float_eq(xs[1].t, 6.0));
+
+        let r1 = Ray::new(Point::new(0.0, 0.5, 0.0), Vector::new(0.0, 0.0, 1.0));
+        let xs1 = c.intersect(&r1);
+        assert!(float_eq(xs1[0].t, -1.0));
+        assert!(float_eq(xs1[1].t, 1.0));
+    }
+
+    #[test]
+    fn a_ray_misses_a_cube() {
+        let c = cube();
+        let r = Ray::new(Point::new(-2.0, 0.0, 0.0), Vector::new(0.2673, 0.5345, 0.8018));
+        let x = c.intersect(&r);
+        assert_eq!(x.len(), 0);
+    }
+
+    #[test]
+    fn the_normal_on_the_surface_of_a_cube() {
+        let c = cube();
+        let p = Point::new(1.0, 0.5, -0.8);
+        let n1 = c.normal_at(p);
+        let n2 = c.normal_at(Point::new(-1.0, -0.2, 0.9));
+        assert!(n1 == Vector::new(1.0, 0.0, 0.0));
+        assert!(n2 == Vector::new(-1.0, 0.0, 0.0));
+    }
 }

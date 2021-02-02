@@ -30,7 +30,7 @@ pub struct Intersections {
     data: Vec<Intersection>
 }
 
-const EPSILON: f64 = 0.00001;
+pub(crate) const EPSILON: f64 = 0.00001;
 
 pub fn schlick(comps: &AugIntersection) -> f64 {
     let mut cos = comps.eyev.dot(comps.normalv);

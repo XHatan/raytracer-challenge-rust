@@ -11,6 +11,7 @@ mod camera;
 mod shape;
 mod pattern;
 
+
 use canvas::Canvas;
 use crate::canvas::CanvasProperties;
 use crate::tuple::{Tuple, TupleProperties, Point, PointProperties, VectorProperties, Vector};
