@@ -1,4 +1,4 @@
-use crate::tuple::{Point, Tuple, Vector};
+use crate::tuple::{Point, Tuple, Vector, VectorProperties};
 
 #[derive(Clone, Copy)]
 pub struct Ray {

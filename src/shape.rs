@@ -5,13 +5,14 @@ enum Kind {
     Sphere,
     Plane,
     Cube,
-    Cylinder
+    Cylinder,
+    DoubleNappedCone // radius at y is abs(y)
 }
 
 pub trait KindProperties {
-    fn normal_at(&self, point: Point) -> Vector;
+    fn normal_at(&self, point: Point, min: f64, max: f64) -> Vector;
 
-    fn intersections(&self, ray: &Ray, transform: Transform) -> Vec<f64>;
+    fn intersections(&self, ray: &Ray, transform: Transform, min: f64, max: f64, closed: bool) -> Vec<f64>;
 
     fn sphere_intersections(&self, ray: &Ray, transform: Transform) -> Vec<f64>;
 
@@ -19,12 +20,13 @@ pub trait KindProperties {
 
     fn cube_intersections(&self, ray: &Ray, transform: Transform) -> Vec<f64>;
 
-    fn cylinder_intersections(&self, ray_world: &Ray, transform: Transform) -> Vec<f64>;
+    fn cylinder_intersections(&self, ray_world: &Ray, transform: Transform, min: f64, max: f64, closed: bool) -> Vec<f64>;
+
+    fn double_napped_cone_intersections(&self, ray_world: &Ray, transform: Transform, min: f64, max: f64, closed: bool) -> Vec<f64>;
 }
 
 impl KindProperties for Kind {
-
-    fn normal_at(&self, local_point: Point) -> Vector {
+    fn normal_at(&self, local_point: Point, min: f64, max: f64) -> Vector {
         match self {
             Sphere => local_point - Point::new(0.0, 0.0, 0.0),
             Plane => Vector::new(0.0, 1.0, 0.0),
@@ -41,19 +43,51 @@ impl KindProperties for Kind {
                     Vector::new(0.0, 0.0, local_point.z())
                 }
             }
+            DoubleNappedCone => {
+                let dist2 = local_point.x() * local_point.x() + local_point.z() * local_point.z();
+                let dist = f64::sqrt(dist2);
+                let y_abs = f64::abs(local_point.y());
+                if y_abs <= f64::EPSILON {
+                    return Vector::new(0.0, 0.0, 0.0);
+                }
+                if dist <= y_abs && local_point.y() >= max - f64::EPSILON  {
+                    return Vector::new(0.0, 1.0, 0.0);
+                }
+
+                if dist <= y_abs && local_point.y() <= min + f64::EPSILON {
+                    return Vector::new(0.0, -1.0, 0.0);
+                }
+
+                return if local_point.y() > 0.0 {
+                    Vector::new(local_point.x(), -dist, local_point.z())
+                } else {
+                    Vector::new(local_point.x(), dist, local_point.z())
+                }
+
+            },
             Cylinder => {
-                Vector::new(local_point.x, 0.0, local_point.z)
+                let dist = local_point.x() * local_point.x() + local_point.z() * local_point.z();
+                if dist <= 1.0 && local_point.y() >= max - f64::EPSILON  {
+                    return Vector::new(0.0, 1.0, 0.0);
+                }
+
+                if dist <= 1.0 && local_point.y() <= min + f64::EPSILON {
+                    return Vector::new(0.0, -1.0, 0.0);
+                }
+
+                return Vector::new(local_point.x(), 0.0, local_point.z())
             }
         }
     }
 
     // pub intersections
-    fn intersections(&self, ray: &Ray, transform: Transform) -> Vec<f64> {
+    fn intersections(&self, ray: &Ray, transform: Transform, min: f64, max: f64, closed: bool) -> Vec<f64> {
         match self {
             Sphere => self.sphere_intersections(ray, transform),
             Plane => self.plane_intersections(ray, transform),
             Cube => self.cube_intersections(ray, transform),
-            Cylinder => unimplemented!()
+            Cylinder => self.cylinder_intersections(ray, transform, min, max, closed),
+            DoubleNappedCone => self.double_napped_cone_intersections(ray, transform, min, max, closed)
         }
     }
 
@@ -68,12 +102,15 @@ impl KindProperties for Kind {
         let c = sphere_to_ray.dot(sphere_to_ray) - 1.0; // (o - o')^2
 
         let discriminant = b * b - 4.0 * a * c;
+        let mut result: Vec<f64> = vec![];
         return if discriminant < 0.0 {
-            vec![]
+            result
         } else {
             let t1 = (-b - f64::sqrt(discriminant)) / (2.0 * a);
             let t2 = (-b + f64::sqrt(discriminant)) / (2.0 * a);
-            vec![t1, t2]
+            result.push(t1);
+            result.push(t2);
+            result
         }
     }
 
@@ -100,27 +137,132 @@ impl KindProperties for Kind {
         }
     }
 
-    fn cylinder_intersections(&self, ray_world: &Ray, transform: Transform) -> Vec<f64> {
+    fn cylinder_intersections(&self, ray_world: &Ray, transform: Transform, min: f64, max: f64, closed: bool) -> Vec<f64> {
         let ray_obj = transform.inverse() * ray_world;
+        let mut result: Vec<f64> = vec![];
+
+        // check capped
+        if closed && f64::abs(ray_obj.direction().y()) > 0.0001 {
+            let t = (min - ray_obj.origin().y()) / ray_obj.direction().y();
+            if check_cap(&ray_obj, t) {
+                result.push(t);
+            }
+
+            let t = (max - ray_obj.origin().y()) / ray_obj.direction().y();
+            if check_cap(&ray_obj, t) {
+                result.push(t);
+            }
+        }
+
         // point = (t * dir + origin)
         // p2 = point(x, z)
         // dir^2 + origin^2 + 2 * t * dir * origin
-        //
         let a = f64::powf(ray_obj.direction().x(), 2.0) + f64::powf(ray_obj.direction().z(), 2.0);
         if f64::abs(a) < 0.00001 {
-            vec![]
+            return result;
         }
-        let b = 2 * ray_obj.origin().x() * ray_obj.direction().x() + 2 * ray_obj.origin().z() * ray_obj.direction().z();
+        let b = 2.0 * ray_obj.origin().x() * ray_obj.direction().x() + 2.0 * ray_obj.origin().z() * ray_obj.direction().z();
         let c = f64::powf(ray_obj.origin().x(), 2.0) + f64::powf(ray_obj.origin().z(), 2.0) - 1.0;
         let disc = f64::powf(b, 2.0) - 4.0 * a * c;
-        return if disc < 0.0 {
-            vec![]
+
+        if disc < 0.0 {
+            return result;
         } else {
-            let t0 = (-b - f64::sqrt(disc)) / (2.0 * a);
-            let t1 = (-b + f64::sqrt(disc)) / (2.0 * a);
-            vec![t0, t1]
+            let mut t0 = (-b - f64::sqrt(disc)) / (2.0 * a);
+            let mut t1 = (-b + f64::sqrt(disc)) / (2.0 * a);
+            if t0 > t1 {
+                swap(&mut t0, &mut t1);
+            }
+            let y0 = t0 * ray_obj.direction().y() + ray_obj.origin().y();
+            if y0 > min && y0 < max {
+                result.push(t0);
+            }
+
+            let y1 = t1 * ray_obj.direction().y() + ray_obj.origin().y();
+            if y1 > min && y1 < max {
+                result.push(t1);
+            }
+
+            return result;
         }
     }
+
+    fn double_napped_cone_intersections(&self, ray_world: &Ray, transform: Transform, min: f64, max: f64, closed: bool) -> Vec<f64> {
+        let ray_obj = transform.inverse() * ray_world;
+        let mut result: Vec<f64> = vec![];
+
+        // check capped
+        if closed && f64::abs(ray_obj.direction().y()) > 0.0001 {
+            let t = (min - ray_obj.origin().y()) / ray_obj.direction().y();
+            if check_cap_cone(&ray_obj, t, min) {
+                result.push(t);
+            }
+
+            let t = (max - ray_obj.origin().y()) / ray_obj.direction().y();
+            if check_cap_cone(&ray_obj, t, max) {
+                result.push(t);
+            }
+        }
+
+        let dx = ray_obj.direction().x();
+        let dy = ray_obj.direction().y();
+        let dz = ray_obj.direction().z();
+
+        let ox = ray_obj.origin().x();
+        let oy = ray_obj.origin().y();
+        let oz = ray_obj.origin().z();
+
+
+        let a = dx * dx - dy * dy + dz * dz;
+        let b = 2.0 * ox * dx - 2.0 * oy * dy + 2.0 * oz * dz;
+        let c = ox * ox - oy * oy + oz * oz;
+
+        if f64::abs(a) <= f64::EPSILON && f64::abs(b) <= f64::EPSILON {
+            return result;
+        }
+
+        if f64::abs(a) <= f64::EPSILON {
+            let t = -c / (2.0 * b);
+            let y = t * dy + oy;
+            if y > min && y < max {
+                result.push(t);
+            }
+        }
+
+        let disc = b * b  - 4.0 * a * c;
+
+        if disc >= 0.0 {
+            let mut t0 = (-b - f64::sqrt(disc)) / (2.0 * a);
+            let mut t1 = (-b + f64::sqrt(disc)) / (2.0 * a);
+            if t0 > t1 {
+                swap(&mut t0, &mut t1);
+            }
+            let y0 = t0 * dy + oy;
+            if y0 > min && y0 < max {
+                result.push(t0);
+            }
+
+            let y1 = t1 * dy + oy;
+            if y1 > min && y1 < max {
+                result.push(t1);
+            }
+        }
+        return result;
+    }
+}
+
+fn check_cap_cone(ray: &Ray, t: f64, y: f64) -> bool {
+    let x = ray.origin().x() + t * ray.direction().x();
+    let z = ray.origin().z() + t * ray.direction().z();
+
+    return (x * x + z * z) <= f64::abs(y);
+}
+
+fn check_cap(ray: &Ray, t: f64) -> bool {
+    let x = ray.origin().x() + t * ray.direction().x();
+    let z = ray.origin().z() + t * ray.direction().z();
+
+    return (x * x + z * z) <= 1.0
 }
 
 fn check_axis(origin_in_axis: f64, direction_in_axis: f64) -> Vec<f64> {
@@ -154,11 +296,16 @@ fn check_axis(origin_in_axis: f64, direction_in_axis: f64) -> Vec<f64> {
 use self::Kind::*;
 use crate::intersection::Intersection;
 use std::mem::swap;
+use std::thread::yield_now;
+use nalgebra::abs;
 
 pub struct Shape {
     pub material: Material,
     pub transform: Transform,
     kind: Kind,
+    cylinder_minimum: f64,
+    cylinder_maximum: f64,
+    cylinder_closed: bool
 }
 
 impl Shape {
@@ -167,6 +314,9 @@ impl Shape {
             material: Material::default(),
             transform: Transform::new(),
             kind,
+            cylinder_minimum: f64::MIN,
+            cylinder_maximum: f64::MAX,
+            cylinder_closed: false
         }
     }
 
@@ -180,6 +330,40 @@ impl Shape {
 
     pub fn cube() -> Shape {
         Shape::new(Cube)
+    }
+
+    pub fn cylinder() -> Shape {
+        Shape::new(Cylinder)
+    }
+
+    pub fn double_napped_cone() -> Shape {
+        Shape::new(DoubleNappedCone)
+    }
+
+    pub fn set_cylinder_truncation(&mut self, min: f64, max: f64) {
+        match self.kind {
+            Cylinder => {
+                self.cylinder_minimum = min;
+                self.cylinder_maximum = max;
+            }
+            DoubleNappedCone => {
+                self.cylinder_minimum = min;
+                self.cylinder_maximum = max;
+            }
+            _ => unimplemented!()
+        }
+    }
+
+    pub fn set_cylinder_closed(&mut self, closed: bool) {
+        match self.kind {
+            Cylinder => {
+                self.cylinder_closed = closed;
+            }
+            DoubleNappedCone => {
+                self.cylinder_closed = closed;
+            }
+            _ => unimplemented!()
+        }
     }
 
     pub fn set_material(&mut self, material: &Material) {
@@ -224,7 +408,8 @@ impl Shape {
     pub fn intersect(&self, ray: &Ray) -> Vec<Intersection> {
         let mut result = vec![];
 
-        for t in self.kind.intersections(ray, self.transform.clone()) {
+        for t in self.kind.intersections(ray, self.transform.clone(),
+                                         self.cylinder_minimum, self.cylinder_maximum, self.cylinder_closed) {
             result.push(
                 Intersection {
                     t,
@@ -253,11 +438,12 @@ impl Shape {
 
     pub fn normal_at(&self, p: Point) -> Vector {
         let point_obj_space = self.transform.inverse() * p;
-        let normal_obj_space = self.kind.normal_at(point_obj_space);
+        let normal_obj_space = self.kind.normal_at(point_obj_space, self.cylinder_minimum, self.cylinder_maximum);
         let mut world_normal = self.transform.inverse().transpose() * normal_obj_space;
         world_normal.data.w = 0.0;
         return world_normal.normalize();
     }
+
 }
 
 impl Clone for Shape {
@@ -265,7 +451,10 @@ impl Clone for Shape {
         Self {
             material: self.material.clone(),
             transform: self.transform.clone(),
-            kind: self.kind.clone()
+            kind: self.kind.clone(),
+            cylinder_minimum: self.cylinder_minimum,
+            cylinder_maximum: self.cylinder_maximum,
+            cylinder_closed: self.cylinder_closed
         }
     }
 }
@@ -305,6 +494,9 @@ pub fn cube() -> Shape {
     Shape::cube()
 }
 
+pub fn cylinder() -> Shape {
+    Shape::cylinder()
+}
 impl PartialEq for Shape {
     fn eq(&self, other: &Self) -> bool {
         self.material == other.material
@@ -485,4 +677,126 @@ mod tests {
         assert!(n1 == Vector::new(1.0, 0.0, 0.0));
         assert!(n2 == Vector::new(-1.0, 0.0, 0.0));
     }
+
+    #[test]
+    fn the_default_minimum_and_maximum_for_a_cylinder() {
+        let cyl = cylinder();
+        assert_eq!(cyl.cylinder_minimum, f64::MIN);
+        assert_eq!(cyl.cylinder_maximum, f64::MAX);
+    }
+
+    #[test]
+    fn intersecting_a_constrained_cylinder() {
+        let mut cyl = cylinder();
+        cyl.set_cylinder_truncation(1.0, 2.0);
+
+        let ray = Ray::new(Point::new(0.0, 2.0, -5.0), Vector::new(0.0, 0.0, 1.0));
+        let xs = cyl.intersect(&ray);
+
+        assert_eq!(xs.len(), 0);
+
+        let ray2 = Ray::new(Point::new(0.0, 1.5, -2.0), Vector::new(0.0, 0.0, 1.0));
+        let xs2 = cyl.intersect(&ray2);
+        assert_eq!(xs2.len(), 2);
+    }
+
+    #[test]
+    fn intersecting_the_caps_of_a_closed_cylinder() {
+        let mut cyl = cylinder();
+        cyl.set_cylinder_truncation(1.0, 2.0);
+        cyl.set_cylinder_closed(true);
+
+        let r = Ray::new(Point::new(0.0, 3.0, 0.0), Vector::new(0.0, -1.0, 0.0));
+        let xs = cyl.intersect(&r);
+        assert_eq!(xs.len(), 2);
+
+        let r = Ray::new(Point::new(0.0, 4.0, -2.0), Vector::new(0.0, -1.0, 1.0).normalize());
+        let xs = cyl.intersect(&r);
+        assert_eq!(xs.len(), 2);
+
+        let r = Ray::new(Point::new(0.0, -1.0, -2.0), Vector::new(0.0, 1.0, 1.0).normalize());
+        let xs = cyl.intersect(&r);
+        assert_eq!(xs.len(), 2);
+    }
+
+    #[test]
+    fn the_normal_vector_on_a_cylinder_end_caps() {
+        let mut cyl = cylinder();
+        cyl.set_cylinder_truncation(1.0, 2.0);
+        cyl.set_cylinder_closed(true);
+
+        let p = Point::new(0.0, 1.0, 0.0);
+        let n = cyl.normal_at(p);
+
+        assert_eq!(n == Vector::new(0.0, -1.0, 0.0), true);
+    }
+
+    #[test]
+    fn intersecting_a_cone_with_a_ray() {
+        let mut shape = Shape::double_napped_cone();
+        let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 0.0, 1.0));
+
+        let xs = shape.intersect(&r);
+
+        assert_eq!(xs.len(), 2);
+        assert!(float_eq(xs[0].t, 5.0));
+        assert!(float_eq(xs[1].t, 5.0));
+
+        let r = Ray::new(Point::new(1.0, 1.0, -5.0), Vector::new(-0.5, -1.0, 1.0).normalize());
+        let xs = shape.intersect(&r);
+        assert!(float_eq(xs[0].t, 4.55006));
+        assert!(float_eq(xs[1].t, 49.44994));
+    }
+
+    #[test]
+    fn intersecting_a_cone_with_a_ray_parallel_to_one_of_its_halves() {
+        let mut shape = Shape::double_napped_cone();
+        let r = Ray::new(Point::new(0.0, 0.0, -1.0), Vector::new(0.0, 1.0, 1.0).normalize());
+
+        let xs = shape.intersect(&r);
+
+        assert_eq!(xs.len(), 1);
+        assert!(float_eq(xs[0].t, 0.35355));
+    }
+
+    #[test]
+    fn intersecting_a_cone_end_caps() {
+        let mut shape = Shape::double_napped_cone();
+        shape.set_cylinder_closed(true);
+        shape.set_cylinder_truncation(-0.5, 0.5);
+
+        let r = Ray::new(Point::new(0.0, 0.0, -5.0), Vector::new(0.0, 1.0, 0.0));
+        let xs = shape.intersect(&r);
+        assert_eq!(xs.len(), 0);
+
+        let r = Ray::new(Point::new(0.0, 0.0, -0.25), Vector::new(0.0, 1.0, 1.0).normalize());
+        let xs = shape.intersect(&r);
+        assert_eq!(xs.len(), 2);
+
+        let r = Ray::new(Point::new(0.0, 0.0, -0.25), Vector::new(0.0, 1.0, 0.0).normalize());
+        let xs = shape.intersect(&r);
+        assert_eq!(xs.len(), 4);
+    }
+
+    #[test]
+    fn computing_normal_vector_on_a_cone() {
+        let shape = Shape::double_napped_cone();
+        let p = Point::new(0.0, 0.0, 0.0);
+        let n = shape.normal_at(p);
+        // TODO: fix zero normalize
+        // assert!(n == Vector::new(0.0, 0.0, 0.0));
+
+        let p = Point::new(1.0, 1.0, 1.0);
+        let n = shape.normal_at(p);
+        assert!(n == Vector::new(1.0, -1.0 * f64::sqrt(2.0), 1.0).normalize());
+
+        let p = Point::new(-1.0, -1.0, 0.0);
+        let n = shape.normal_at(p);
+        assert!(n == Vector::new(-1.0, 1.0, 0.0).normalize());
+    }
+
+
+
+
+
 }
