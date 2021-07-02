@@ -1,7 +1,6 @@
 use std::ops;
 use crate::matrix::Matrix;
 use nalgebra::DMatrix;
-use std::ops::Sub;
 
 #[derive(Copy, Clone)]
 pub struct Tuple {

@@ -1,7 +1,8 @@
 
 use crate::*;
-use crate::shape::Shape;
 use self::Kind::*;
+use crate::shape_props::ShapeProperties;
+use std::rc::Rc;
 
 #[derive(PartialEq, Clone)]
 pub enum Kind {
@@ -68,8 +69,8 @@ impl Pattern {
         self.kind.color_at(point)
     }
 
-    pub fn color_at_object(&self, shape: &Shape, point: Point) -> Tuple {
-        let object_point = shape.transform.inverse() * point;
+    pub fn color_at_object(&self, shape: &dyn ShapeProperties, point: Point) -> Tuple {
+        let object_point = shape.transform().inverse() * point;
         let pattern_point = self.transform.inverse() * object_point;
         self.kind.color_at(pattern_point)
     }

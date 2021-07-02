@@ -2,7 +2,6 @@ use crate::matrix::{Matrix, MatrixProperties};
 use nalgebra;
 use crate::tuple::{Tuple, TupleProperties, Vector, Point, VectorProperties, PointProperties};
 use crate::ray::Ray;
-use std::ops::{Mul, Index};
 
 pub struct Transform {
     matrix: Matrix,

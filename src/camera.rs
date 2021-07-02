@@ -116,8 +116,6 @@ mod tests {
     use super::*;
     use std::f64::consts::PI;
     use crate::tuple::Vector;
-    use std::ops::Sub;
-    use crate::transformation::ViewTransform;
 
     #[test]
     fn test_camera_construction() {

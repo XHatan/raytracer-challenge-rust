@@ -1,6 +1,5 @@
 use nalgebra;
 use crate::tuple::{Tuple, TupleProperties};
-use nalgebra::DMatrix;
 
 pub struct Matrix {
     pub data: nalgebra::DMatrix<f64>
